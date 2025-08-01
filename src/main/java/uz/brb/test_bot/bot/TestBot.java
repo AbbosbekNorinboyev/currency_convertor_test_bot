@@ -19,6 +19,8 @@ import uz.brb.test_bot.repository.UserRepository;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.net.URL;
 import java.net.URLConnection;
 import java.time.LocalDateTime;
@@ -39,7 +41,6 @@ public class TestBot extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        SendMessage sendMessage = new SendMessage();
         if (update.hasMessage() && update.getMessage().hasText()) {
             String data = update.getMessage().getText();
             Long chatId = update.getMessage().getChatId();
@@ -80,7 +81,7 @@ public class TestBot extends TelegramLongPollingBot {
                         // Valyutalar
                         String fromCcy = selectedCurrency.remove(chatId); // Masalan: "USD", "UZS"
                         String toCcy = data.substring(3);                 // "TO_USD" -> "USD"
-                        Double amount = Double.valueOf(enteredAmount.remove(chatId)); // kiritilgan summa
+                        BigDecimal amount = new BigDecimal(enteredAmount.remove(chatId)); // kiritilgan summa
 
                         CurrencyRate fromRate = currencyRates.stream()
                                 .filter(r -> r.getCcy().equals(fromCcy))
@@ -92,41 +93,41 @@ public class TestBot extends TelegramLongPollingBot {
                                 .findFirst()
                                 .orElse(null);
 
-                        Double result;
+                        BigDecimal result;
 
                         if (fromCcy.equals("UZS") && toRate != null) {
                             // UZS -> boshqa valyuta
-                            Double rate = Double.valueOf(toRate.getRate());
-                            Double nominal = Double.valueOf(toRate.getNominal());
-                            result = amount / (rate / nominal);
+                            BigDecimal rate = new BigDecimal(toRate.getRate());
+                            BigDecimal nominal = new BigDecimal(toRate.getNominal());
+                            result = amount.divide(rate.divide(nominal, 8, RoundingMode.HALF_UP), 2, RoundingMode.HALF_UP);
                         } else if (toCcy.equals("UZS") && fromRate != null) {
                             // boshqa valyuta -> UZS
-                            Double rate = Double.valueOf(fromRate.getRate());
-                            Double nominal = Double.valueOf(fromRate.getNominal());
-                            result = amount * rate / nominal;
+                            BigDecimal rate = new BigDecimal(fromRate.getRate());
+                            BigDecimal nominal = new BigDecimal(fromRate.getNominal());
+                            result = amount.multiply(rate).divide(nominal, 2, RoundingMode.HALF_UP);
                         } else if (fromRate != null && toRate != null) {
                             // boshqa valyuta -> boshqa valyuta
-                            Double fromRateVal = Double.valueOf(fromRate.getRate());
-                            Double fromNominal = Double.valueOf(fromRate.getNominal());
-                            Double toRateVal = Double.valueOf(toRate.getRate());
-                            Double toNominal = Double.valueOf(toRate.getNominal());
+                            BigDecimal fromRateVal = new BigDecimal(fromRate.getRate());
+                            BigDecimal fromNominal = new BigDecimal(fromRate.getNominal());
+                            BigDecimal toRateVal = new BigDecimal(toRate.getRate());
+                            BigDecimal toNominal = new BigDecimal(toRate.getNominal());
 
-                            result = amount * fromRateVal / fromNominal / (toRateVal / toNominal);
+                            BigDecimal uzsAmount = amount.multiply(fromRateVal).divide(fromNominal, 8, RoundingMode.HALF_UP);
+                            result = uzsAmount.divide(toRateVal.divide(toNominal, 8, RoundingMode.HALF_UP), 2, RoundingMode.HALF_UP);
                         } else {
                             sendText(chatId, "❌ Valyuta ma'lumotlari topilmadi.");
                             return;
                         }
 
                         sendText(chatId, "💱 Valyuta konvertatsiyasi:\n" +
-                                "💰 Kiritilgan miqdor: " + amount + " " + fromCcy + "\n" +
-                                "🔄 Natija: " + result + " " + toCcy);
+                                "💰 Kiritilgan miqdor: " + amount.stripTrailingZeros().toPlainString() + " " + fromCcy + "\n" +
+                                "🔄 Natija: " + result.stripTrailingZeros().toPlainString() + " " + toCcy);
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
                     sendText(chatId, "❌ Ma'lumotlarni yuklashda xatolik yuz berdi.");
                 }
             }
-
         }
     }
 
@@ -154,7 +155,7 @@ public class TestBot extends TelegramLongPollingBot {
         SendMessage message = new SendMessage(chatId.toString(), "Valyutani tanlang (FROM):");
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
 
-        List<String> currencies = List.of("UZS", "USD", "JPY", "RUB"); // Qo‘shimcha valyutalar ham kiritishingiz mumkin
+        List<String> currencies = List.of("UZS", "USD", "EUR", "JPY", "RUB", "KGS"); // Qo‘shimcha valyutalar ham kiritishingiz mumkin
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
         List<InlineKeyboardButton> row = new ArrayList<>();
 
@@ -183,7 +184,7 @@ public class TestBot extends TelegramLongPollingBot {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        List<String> currencies = List.of("UZS", "USD", "JPY", "RUB");
+        List<String> currencies = List.of("UZS", "USD", "EUR", "JPY", "RUB", "KGS");
 
         List<InlineKeyboardButton> row = new ArrayList<>();
         for (int i = 0; i < currencies.size(); i++) {
