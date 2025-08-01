@@ -6,16 +6,16 @@ import org.springframework.context.annotation.Configuration;
 import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
-import uz.brb.test_bot.repository.UserRepository;
+import uz.brb.test_bot.config.AuthUserConfig;
 
 @Configuration
 @RequiredArgsConstructor
 public class BotConfig {
-    private final UserRepository userRepository;
+    private final AuthUserConfig authUserConfig;
 
     @Bean
     public TestBot testBot() {
-        TestBot testBot = new TestBot(userRepository);
+        TestBot testBot = new TestBot(authUserConfig);
         try {
             TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
             telegramBotsApi.registerBot(testBot);

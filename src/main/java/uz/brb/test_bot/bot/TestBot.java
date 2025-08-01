@@ -12,9 +12,8 @@ import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.InlineKeyboardMarkup;
 import org.telegram.telegrambots.meta.api.objects.replykeyboard.buttons.InlineKeyboardButton;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import uz.brb.test_bot.config.AuthUserConfig;
 import uz.brb.test_bot.entity.CurrencyRate;
-import uz.brb.test_bot.entity.User;
-import uz.brb.test_bot.repository.UserRepository;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -23,7 +22,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URL;
 import java.net.URLConnection;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -34,7 +32,7 @@ import java.util.Map;
 @Component(value = "testBot")
 @RequiredArgsConstructor
 public class TestBot extends TelegramLongPollingBot {
-    private final UserRepository userRepository;
+    private final AuthUserConfig authUserConfig;
 
     private final Map<Long, String> selectedCurrency = new HashMap<>();
     private final Map<Long, String> enteredAmount = new HashMap<>();
@@ -45,7 +43,7 @@ public class TestBot extends TelegramLongPollingBot {
             String data = update.getMessage().getText();
             Long chatId = update.getMessage().getChatId();
 
-            saveAuthUser(update, chatId);
+            authUserConfig.saveAuthUser(update, chatId);
 
             if (selectedCurrency.containsKey(chatId) && !enteredAmount.containsKey(chatId)) {
                 enteredAmount.put(chatId, data); // summani saqlaymiz
@@ -151,26 +149,6 @@ public class TestBot extends TelegramLongPollingBot {
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
         executeSafely(message);
-    }
-
-    private void saveAuthUser(Update update, Long chatId) {
-        String username = update.getMessage().getFrom().getUserName(); // 🧑 Username
-        String firstName = update.getMessage().getFrom().getFirstName(); // 🪪 First name
-        String lastName = update.getMessage().getFrom().getLastName(); // 👤 Last name
-
-        User user = userRepository.findByChatId(chatId).orElse(null);
-        if (user == null) {
-            user = new User();
-            user.setChatId(chatId);
-            user.setUsername(username);
-            user.setFirstname(firstName);
-            user.setLastname(lastName);
-            user.setCreatedAt(LocalDateTime.now());
-            user.setLastActiveAt(LocalDateTime.now());
-        } else {
-            user.setLastActiveAt(LocalDateTime.now());
-        }
-        userRepository.save(user);
     }
 
     private void sendCurrencyButtons(Long chatId) {
