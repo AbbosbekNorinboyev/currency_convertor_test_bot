@@ -1,0 +1,25 @@
+server:
+  port: 8766
+spring:
+  application:
+    name: test_bot
+
+  datasource:
+    url: jdbc:postgresql://localhost:5432/project?currentSchema=test_bot
+    username: postgres
+    password: 2210
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    database: postgresql
+
+  security:
+    user:
+      password: admin
+      name: admin
+
+  main:
+    allow-circular-references: true
