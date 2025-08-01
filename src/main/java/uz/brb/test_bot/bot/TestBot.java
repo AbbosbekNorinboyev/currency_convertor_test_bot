@@ -53,22 +53,25 @@ public class TestBot extends TelegramLongPollingBot {
                 return;
             }
 
-            if ("/start".equals(data)) {
-                sendCurrencyButtons(chatId);
+            if (data.equals("/start")) {
+                sendStartMenu(chatId);
             }
+
         } else if (update.hasCallbackQuery()) {
             String data = update.getCallbackQuery().getData();
             Long chatId = update.getCallbackQuery().getMessage().getChatId();
 
-
-            if (data.startsWith("CURR_")) {
+            if (data.equals("GET_RATES")) {
+                sendCurrencyButtons(chatId);
+                String fromCurrency = data.substring(5);
+                selectedCurrency.put(chatId, fromCurrency);
+            } else if (data.equals("BACK_TO_START")) {
+                sendStartMenu(chatId); // asosiy menyuga qaytadi
+            } else if (data.startsWith("CURR_")) {
                 String fromCurrency = data.substring(5);
                 selectedCurrency.put(chatId, fromCurrency);
                 sendText(chatId, "Iltimos, summani kiriting:");
-                return;
-            }
-
-            if (data.startsWith("TO_")) {
+            } else if (data.startsWith("TO_")) {
                 try {
                     Gson gson = new Gson();
                     URL url = new URL("https://cbu.uz/oz/arkhiv-kursov-valyut/json/");
@@ -131,6 +134,25 @@ public class TestBot extends TelegramLongPollingBot {
         }
     }
 
+    private void sendStartMenu(Long chatId) {
+        SendMessage message = new SendMessage(chatId.toString(), "Assalomu alaykum! Quyidagilardan birini tanlang:");
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        InlineKeyboardButton button1 = new InlineKeyboardButton("💱 Valyuta kursi");
+        button1.setCallbackData("GET_RATES");
+
+        InlineKeyboardButton backButton = new InlineKeyboardButton("⬅️ Ortga");
+        backButton.setCallbackData("BACK_TO_START");
+
+        rows.add(List.of(button1));
+        rows.add(List.of(backButton));
+
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        executeSafely(message);
+    }
+
     private void saveAuthUser(Update update, Long chatId) {
         String username = update.getMessage().getFrom().getUserName(); // 🧑 Username
         String firstName = update.getMessage().getFrom().getFirstName(); // 🪪 First name
@@ -157,20 +179,23 @@ public class TestBot extends TelegramLongPollingBot {
 
         List<String> currencies = List.of("UZS", "USD", "EUR", "JPY", "RUB", "KGS"); // Qo‘shimcha valyutalar ham kiritishingiz mumkin
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
-        List<InlineKeyboardButton> row = new ArrayList<>();
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
 
         for (int i = 0; i < currencies.size(); i++) {
             String currency = currencies.get(i);
             InlineKeyboardButton button = new InlineKeyboardButton(currency);
+            button.setText(currency);
             button.setCallbackData("CURR_" + currency);
-            row.add(button);
+            row1.add(button);
 
             // Har 3 tugmadan keyin yangi qator
             if ((i + 1) % 3 == 0 || i == currencies.size() - 1) {
-                rows.add(row);
-                row = new ArrayList<>();
+                rows.add(row1);
+                row1 = new ArrayList<>();
             }
         }
+
+        rows.addAll(getMainInlineMenu());
 
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
@@ -186,25 +211,32 @@ public class TestBot extends TelegramLongPollingBot {
 
         List<String> currencies = List.of("UZS", "USD", "EUR", "JPY", "RUB", "KGS");
 
-        List<InlineKeyboardButton> row = new ArrayList<>();
+        List<InlineKeyboardButton> row1 = new ArrayList<>();
         for (int i = 0; i < currencies.size(); i++) {
             String currency = currencies.get(i);
             InlineKeyboardButton button = new InlineKeyboardButton(currency);
             button.setCallbackData("TO_" + currency);
-            row.add(button);
+            row1.add(button);
 
             // 3 tadan tugma bo‘lsa, yangi qator boshlaymiz
             if ((i + 1) % 3 == 0 || i == currencies.size() - 1) {
-                rows.add(row);
-                row = new ArrayList<>();
+                rows.add(row1);
+                row1 = new ArrayList<>();
             }
         }
+
+        rows.addAll(getMainInlineMenu());
 
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
         executeSafely(message);
     }
 
+    private List<List<InlineKeyboardButton>> getMainInlineMenu() {
+        InlineKeyboardButton row2 = new InlineKeyboardButton("⬅\uFE0F Ortga");
+        row2.setCallbackData("BACK_TO_START");
+        return List.of(List.of(row2));
+    }
 
     private void sendText(Long chatId, String text) {
         SendMessage message = new SendMessage(chatId.toString(), text);
