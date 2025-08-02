@@ -12,10 +12,11 @@ import uz.brb.test_bot.config.AuthUserConfig;
 @RequiredArgsConstructor
 public class BotConfig {
     private final AuthUserConfig authUserConfig;
+    private final Button button;
 
     @Bean
     public TestBot testBot() {
-        TestBot testBot = new TestBot(authUserConfig);
+        TestBot testBot = new TestBot(authUserConfig, button);
         try {
             TelegramBotsApi telegramBotsApi = new TelegramBotsApi(DefaultBotSession.class);
             telegramBotsApi.registerBot(testBot);

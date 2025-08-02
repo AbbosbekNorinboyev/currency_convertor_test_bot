@@ -33,6 +33,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class TestBot extends TelegramLongPollingBot {
     private final AuthUserConfig authUserConfig;
+    private final Button button;
 
     private final Map<Long, String> selectedCurrency = new HashMap<>();
     private final Map<Long, String> enteredAmount = new HashMap<>();
@@ -103,12 +104,30 @@ public class TestBot extends TelegramLongPollingBot {
                                     fromRate.getRate(),
                                     fromRate.getDate()
                             );
+                            sendText(chatId, responseTextFromRate);
                         }
 
                         CurrencyRate toRate = currencyRates.stream()
                                 .filter(r -> r.getCcy().equals(toCcy))
                                 .findFirst()
                                 .orElse(null);
+
+                        // TO valyuta haqida ma’lumot
+                        String responseTextToRate = null;
+                        if (toRate != null) {
+                            responseTextToRate = String.format(
+                                    "\uD83D\uDCB1 TO Valyuta\n" +
+                                            "🌍 Davlat kodi: %s\n" +
+                                            "💵 Nominal: %s\n" +
+                                            "💰 Kurs: %s so'm\n" +
+                                            "📅 Sana: %s",
+                                    toRate.getCcy(),
+                                    toRate.getNominal(),
+                                    toRate.getRate(),
+                                    toRate.getDate()
+                            );
+                            sendText(chatId, responseTextToRate);
+                        }
 
                         BigDecimal result;
 
@@ -135,11 +154,11 @@ public class TestBot extends TelegramLongPollingBot {
                             sendText(chatId, "❌ Valyuta ma'lumotlari topilmadi.");
                             return;
                         }
-                        sendText(chatId, responseTextFromRate);
 
                         sendText(chatId, "💱 Valyuta konvertatsiyasi\n" +
                                 "💰 Kiritilgan miqdor: " + amount.stripTrailingZeros().toPlainString() + " " + fromCcy + "\n" +
                                 "🔄 Natija: " + result.stripTrailingZeros().toPlainString() + " " + toCcy);
+
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
@@ -190,13 +209,12 @@ public class TestBot extends TelegramLongPollingBot {
             }
         }
 
-        rows.addAll(getMainInlineMenu());
+        rows.addAll(button.getMainInlineMenu());
 
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
         executeSafely(message);
     }
-
 
     private void sendConversionTargetButtons(Long chatId) {
         SendMessage message = new SendMessage(chatId.toString(), "Qaysi valyutaga o‘girishni xohlaysiz (TO):");
@@ -220,17 +238,11 @@ public class TestBot extends TelegramLongPollingBot {
             }
         }
 
-        rows.addAll(getMainInlineMenu());
+        rows.addAll(button.getMainInlineMenu());
 
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
         executeSafely(message);
-    }
-
-    private List<List<InlineKeyboardButton>> getMainInlineMenu() {
-        InlineKeyboardButton row2 = new InlineKeyboardButton("⬅\uFE0F Ortga");
-        row2.setCallbackData("BACK_TO_START");
-        return List.of(List.of(row2));
     }
 
     private void sendText(Long chatId, String text) {
