@@ -89,6 +89,22 @@ public class TestBot extends TelegramLongPollingBot {
                                 .findFirst()
                                 .orElse(null);
 
+                        // Valyuta haqida info chiqarish
+                        String responseTextFromRate = null;
+                        if (fromRate != null) {
+                            responseTextFromRate = String.format(
+                                    "\uD83D\uDCB1 Tanlangan valyuta\n" +
+                                            "🌍 Davlat kodi: %s\n" +
+                                            "💵 Nominal: %s\n" +
+                                            "💰 Kurs: %s so'm\n" +
+                                            "📅 Sana: %s",
+                                    fromRate.getCcy(),
+                                    fromRate.getNominal(),
+                                    fromRate.getRate(),
+                                    fromRate.getDate()
+                            );
+                        }
+
                         CurrencyRate toRate = currencyRates.stream()
                                 .filter(r -> r.getCcy().equals(toCcy))
                                 .findFirst()
@@ -119,8 +135,9 @@ public class TestBot extends TelegramLongPollingBot {
                             sendText(chatId, "❌ Valyuta ma'lumotlari topilmadi.");
                             return;
                         }
+                        sendText(chatId, responseTextFromRate);
 
-                        sendText(chatId, "💱 Valyuta konvertatsiyasi:\n" +
+                        sendText(chatId, "💱 Valyuta konvertatsiyasi\n" +
                                 "💰 Kiritilgan miqdor: " + amount.stripTrailingZeros().toPlainString() + " " + fromCcy + "\n" +
                                 "🔄 Natija: " + result.stripTrailingZeros().toPlainString() + " " + toCcy);
                     }
