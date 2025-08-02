@@ -112,23 +112,6 @@ public class TestBot extends TelegramLongPollingBot {
                                 .findFirst()
                                 .orElse(null);
 
-                        // TO valyuta haqida ma’lumot
-                        String responseTextToRate = null;
-                        if (toRate != null) {
-                            responseTextToRate = String.format(
-                                    "\uD83D\uDCB1 TO Valyuta\n" +
-                                            "🌍 Davlat kodi: %s\n" +
-                                            "💵 Nominal: %s\n" +
-                                            "💰 Kurs: %s so'm\n" +
-                                            "📅 Sana: %s",
-                                    toRate.getCcy(),
-                                    toRate.getNominal(),
-                                    toRate.getRate(),
-                                    toRate.getDate()
-                            );
-                            sendText(chatId, responseTextToRate);
-                        }
-
                         BigDecimal result;
 
                         if (fromCcy.equals("UZS") && toRate != null) {
@@ -158,7 +141,6 @@ public class TestBot extends TelegramLongPollingBot {
                         sendText(chatId, "💱 Valyuta konvertatsiyasi\n" +
                                 "💰 Kiritilgan miqdor: " + amount.stripTrailingZeros().toPlainString() + " " + fromCcy + "\n" +
                                 "🔄 Natija: " + result.stripTrailingZeros().toPlainString() + " " + toCcy);
-
                     }
                 } catch (IOException e) {
                     e.printStackTrace();
