@@ -22,10 +22,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URL;
 import java.net.URLConnection;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
 
 @Slf4j
 @Primary
@@ -146,6 +145,11 @@ public class TestBot extends TelegramLongPollingBot {
                     e.printStackTrace();
                     sendText(chatId, "❌ Ma'lumotlarni yuklashda xatolik yuz berdi.");
                 }
+            } else if (data.equals("HISTORY")) {
+                sendHistoryButton(chatId);
+            } else if (data.startsWith("HISTORY_")) {
+                String currencyCode = data.substring(8); // Masalan: "USD"
+                sendCurrencyHistory(chatId, currencyCode);
             }
         }
     }
@@ -158,15 +162,81 @@ public class TestBot extends TelegramLongPollingBot {
         InlineKeyboardButton button1 = new InlineKeyboardButton("💱 Valyuta kursi");
         button1.setCallbackData("GET_RATES");
 
+        InlineKeyboardButton history = new InlineKeyboardButton("⬅️ Valyutalar tarixi");
+        history.setCallbackData("HISTORY");
+
         InlineKeyboardButton backButton = new InlineKeyboardButton("⬅️ Ortga");
         backButton.setCallbackData("BACK_TO_START");
 
         rows.add(List.of(button1));
+        rows.add(List.of(history));
         rows.add(List.of(backButton));
 
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
         executeSafely(message);
+    }
+
+    private void sendHistoryButton(Long chatId) {
+        SendMessage message = new SendMessage(chatId.toString(), "Qaysi valyutaning 7 kunlik tarixini ko‘rmoqchisiz?");
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        InlineKeyboardButton buttonUZS = new InlineKeyboardButton("🇺🇿 UZS");
+        buttonUZS.setCallbackData("HISTORY_UZS");
+
+        InlineKeyboardButton buttonUSD = new InlineKeyboardButton("🇺🇸 USD");
+        buttonUSD.setCallbackData("HISTORY_USD");
+
+        InlineKeyboardButton buttonEUR = new InlineKeyboardButton("🇪🇺 EUR");
+        buttonEUR.setCallbackData("HISTORY_EUR");
+
+        InlineKeyboardButton buttonJPY = new InlineKeyboardButton("🇯🇵 JPY");
+        buttonJPY.setCallbackData("HISTORY_JPY");
+
+        InlineKeyboardButton buttonRUB = new InlineKeyboardButton("🇷🇺 RUB");
+        buttonRUB.setCallbackData("HISTORY_RUB");
+
+        InlineKeyboardButton buttonKGS = new InlineKeyboardButton("🇰🇬 KGS");
+        buttonKGS.setCallbackData("HISTORY_KGS");
+
+        rows.add(List.of(buttonUZS, buttonUSD, buttonEUR));
+        rows.add(List.of(buttonJPY, buttonRUB, buttonKGS));
+        rows.addAll(button.getMainInlineMenu());
+
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        executeSafely(message);
+    }
+
+    private void sendCurrencyHistory(Long chatId, String currencyCode) {
+        try {
+            Gson gson = new Gson();
+            StringBuilder response = new StringBuilder("📊 " + currencyCode + " kursi (so‘nggi 7 kun):\n\n");
+
+            for (int i = 0; i < 7; i++) {
+                LocalDate date = LocalDate.now().minusDays(i);
+                String dateStr = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                String urlStr = "https://cbu.uz/oz/arkhiv-kursov-valyut/json/" + currencyCode + "/" + dateStr + "/";
+                URL url = new URL(urlStr);
+
+                URLConnection connection = url.openConnection();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                List<CurrencyRate> rates = gson.fromJson(reader, new TypeToken<List<CurrencyRate>>() {
+                }.getType());
+
+                if (!rates.isEmpty()) {
+                    CurrencyRate rate = rates.get(0);
+                    response.append("📅 ").append(rate.getDate())
+                            .append(" - 💰 ").append(rate.getRate()).append("\n");
+                }
+            }
+
+            SendMessage message = new SendMessage(chatId.toString(), response.toString());
+            executeSafely(message);
+        } catch (Exception e) {
+            sendText(chatId, "❌ Valyuta tarixi olinmadi: " + e.getMessage());
+        }
     }
 
     private void sendCurrencyButtons(Long chatId) {
