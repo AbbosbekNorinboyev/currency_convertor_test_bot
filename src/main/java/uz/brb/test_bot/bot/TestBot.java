@@ -150,6 +150,11 @@ public class TestBot extends TelegramLongPollingBot {
             } else if (data.startsWith("HISTORY_")) {
                 String currencyCode = data.substring(8); // Masalan: "USD"
                 sendCurrencyHistory(chatId, currencyCode);
+            } else if (data.equals("STATISTIC")) {
+                sendStatisticsButton(chatId);
+            } else if (data.startsWith("STATISTIC_")) {
+                String currencyCode = data.substring(10); // Masalan: "USD"
+                sendStatisticsWithStats(chatId, currencyCode);
             }
         }
     }
@@ -165,12 +170,107 @@ public class TestBot extends TelegramLongPollingBot {
         InlineKeyboardButton history = new InlineKeyboardButton("\uD83D\uDCC5 Valyutalar tarixi");
         history.setCallbackData("HISTORY");
 
+        InlineKeyboardButton statistic = new InlineKeyboardButton("\uD83E\uDDE0 Valyuta haqida statistik ma’lumot");
+        statistic.setCallbackData("STATISTIC");
+
         InlineKeyboardButton backButton = new InlineKeyboardButton("⬅️ Ortga");
         backButton.setCallbackData("BACK_TO_START");
 
         rows.add(List.of(button1));
         rows.add(List.of(history));
+        rows.add(List.of(statistic));
         rows.add(List.of(backButton));
+
+        markup.setKeyboard(rows);
+        message.setReplyMarkup(markup);
+        executeSafely(message);
+    }
+
+    private void sendStatisticsWithStats(Long chatId, String ccy) {
+        try {
+            Gson gson = new Gson();
+            StringBuilder text = new StringBuilder("\uD83C\uDF03 " + ccy + " kursi (so‘nggi 7 kun):\n\n");
+            List<CurrencyRate> allRates = new ArrayList<>();
+            Set<String> uniqueDates = new HashSet<>();
+
+            int dayOffset = 0;
+            while (allRates.size() < 7 && dayOffset < 15) { // Agar 7 ta topilmasa, 15 kungacha qidramiz
+                LocalDate date = LocalDate.now().minusDays(dayOffset++);
+                String dateStr = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+                String urlStr = "https://cbu.uz/oz/arkhiv-kursov-valyut/json/" + ccy + "/" + dateStr + "/";
+                URL url = new URL(urlStr);
+
+                URLConnection connection = url.openConnection();
+                BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+                List<CurrencyRate> rates = gson.fromJson(reader, new TypeToken<List<CurrencyRate>>() {
+                }.getType());
+
+                for (CurrencyRate rate : rates) {
+                    if (rate.getCcy().equalsIgnoreCase(ccy) && uniqueDates.add(rate.getDate())) {
+                        allRates.add(rate);
+                        break;
+                    }
+                }
+            }
+
+            if (!allRates.isEmpty()) {
+                allRates.sort(Comparator.comparing(CurrencyRate::getDate).reversed()); // Eng yangi yuqorida
+                List<BigDecimal> values = new ArrayList<>();
+
+                for (CurrencyRate rate : allRates) {
+                    String line = String.format("📅 %s - 💰 %s\n", rate.getDate(), rate.getRate());
+                    text.append(line);
+                    values.add(new BigDecimal(rate.getRate()));
+                }
+
+                // Statistikalar
+                BigDecimal max = values.stream().max(Comparator.naturalOrder()).orElse(BigDecimal.ZERO);
+                BigDecimal min = values.stream().min(Comparator.naturalOrder()).orElse(BigDecimal.ZERO);
+                BigDecimal avg = values.stream()
+                        .reduce(BigDecimal.ZERO, BigDecimal::add)
+                        .divide(BigDecimal.valueOf(values.size()), 2, RoundingMode.HALF_UP);
+
+                text.append("\n📊 Statistika (7 kun):\n");
+                text.append("📈 Eng yuqori: ").append(max).append("\n");
+                text.append("📉 Eng past: ").append(min).append("\n");
+                text.append("📊 O‘rtacha: ").append(avg).append("\n");
+            } else {
+                text.append("Ma'lumotlar topilmadi.");
+            }
+
+            SendMessage message = new SendMessage(chatId.toString(), text.toString());
+            executeSafely(message);
+        } catch (Exception e) {
+            sendText(chatId, "❌ Valyuta statistikasi olinmadi: " + e.getMessage());
+        }
+    }
+
+    private void sendStatisticsButton(Long chatId) {
+        SendMessage message = new SendMessage(chatId.toString(), "Qaysi valyutaning 7 kunlik tarixini va statistikasini ko‘rmoqchisiz?");
+        InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
+        List<List<InlineKeyboardButton>> rows = new ArrayList<>();
+
+        InlineKeyboardButton buttonUZS = new InlineKeyboardButton("🇺🇿 UZS");
+        buttonUZS.setCallbackData("STATISTIC_UZS");
+
+        InlineKeyboardButton buttonUSD = new InlineKeyboardButton("🇺🇸 USD");
+        buttonUSD.setCallbackData("STATISTIC_USD");
+
+        InlineKeyboardButton buttonEUR = new InlineKeyboardButton("🇪🇺 EUR");
+        buttonEUR.setCallbackData("STATISTIC_EUR");
+
+        InlineKeyboardButton buttonJPY = new InlineKeyboardButton("🇯🇵 JPY");
+        buttonJPY.setCallbackData("STATISTIC_JPY");
+
+        InlineKeyboardButton buttonRUB = new InlineKeyboardButton("🇷🇺 RUB");
+        buttonRUB.setCallbackData("STATISTIC_RUB");
+
+        InlineKeyboardButton buttonKGS = new InlineKeyboardButton("🇰🇬 KGS");
+        buttonKGS.setCallbackData("STATISTIC_KGS");
+
+        rows.add(List.of(buttonUZS, buttonUSD, buttonEUR));
+        rows.add(List.of(buttonJPY, buttonRUB, buttonKGS));
+        rows.addAll(button.getMainInlineMenu());
 
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
@@ -228,7 +328,7 @@ public class TestBot extends TelegramLongPollingBot {
 
                 if (!rates.isEmpty()) {
                     CurrencyRate rate = rates.get(0);
-                    if (!addedDates.contains(rate.getDate())){
+                    if (!addedDates.contains(rate.getDate())) {
                         response.append("📅 ").append(rate.getDate())
                                 .append(" - 💰 ").append(rate.getRate()).append("\n");
                         addedDates.add(rate.getDate());
