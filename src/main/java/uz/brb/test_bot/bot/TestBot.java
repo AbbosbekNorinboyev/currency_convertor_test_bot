@@ -159,10 +159,10 @@ public class TestBot extends TelegramLongPollingBot {
         InlineKeyboardMarkup markup = new InlineKeyboardMarkup();
         List<List<InlineKeyboardButton>> rows = new ArrayList<>();
 
-        InlineKeyboardButton button1 = new InlineKeyboardButton("💱 Valyuta kursi");
+        InlineKeyboardButton button1 = new InlineKeyboardButton("\uD83C\uDF10 Valyutalar kursi");
         button1.setCallbackData("GET_RATES");
 
-        InlineKeyboardButton history = new InlineKeyboardButton("⬅️ Valyutalar tarixi");
+        InlineKeyboardButton history = new InlineKeyboardButton("\uD83D\uDCC5 Valyutalar tarixi");
         history.setCallbackData("HISTORY");
 
         InlineKeyboardButton backButton = new InlineKeyboardButton("⬅️ Ortga");
