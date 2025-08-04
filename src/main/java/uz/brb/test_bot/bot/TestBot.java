@@ -213,6 +213,7 @@ public class TestBot extends TelegramLongPollingBot {
         try {
             Gson gson = new Gson();
             StringBuilder response = new StringBuilder("📊 " + currencyCode + " kursi (so‘nggi 7 kun):\n\n");
+            Set<String> addedDates = new HashSet<>(); // Takrorlanmaslik uchun
 
             for (int i = 0; i < 7; i++) {
                 LocalDate date = LocalDate.now().minusDays(i);
@@ -227,8 +228,11 @@ public class TestBot extends TelegramLongPollingBot {
 
                 if (!rates.isEmpty()) {
                     CurrencyRate rate = rates.get(0);
-                    response.append("📅 ").append(rate.getDate())
-                            .append(" - 💰 ").append(rate.getRate()).append("\n");
+                    if (!addedDates.contains(rate.getDate())){
+                        response.append("📅 ").append(rate.getDate())
+                                .append(" - 💰 ").append(rate.getRate()).append("\n");
+                        addedDates.add(rate.getDate());
+                    }
                 }
             }
 
