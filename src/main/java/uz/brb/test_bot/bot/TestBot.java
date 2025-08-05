@@ -37,6 +37,9 @@ public class TestBot extends TelegramLongPollingBot {
     private final Map<Long, String> selectedCurrency = new HashMap<>();
     private final Map<Long, String> enteredAmount = new HashMap<>();
 
+    // ChatId orqali foydalanuvchi holatini saqlash
+    private final Map<Long, Boolean> waitingForCalculatorInput = new HashMap<>();
+
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
@@ -48,6 +51,14 @@ public class TestBot extends TelegramLongPollingBot {
             if (selectedCurrency.containsKey(chatId) && !enteredAmount.containsKey(chatId)) {
                 enteredAmount.put(chatId, data); // summani saqlaymiz
                 sendConversionTargetButtons(chatId); // valyutaga o‘girish buttonlarini yuboramiz
+                return;
+            }
+
+            // Agar foydalanuvchi kalkulyator uchun kutilyapti
+            if (waitingForCalculatorInput.getOrDefault(chatId, false)) {
+                waitingForCalculatorInput.remove(chatId); // bir marta ishlatiladi
+                String result = handleMultiCurrencyConvert(data.trim());
+                executeSafely(new SendMessage(chatId.toString(), result));
                 return;
             }
 
@@ -155,6 +166,13 @@ public class TestBot extends TelegramLongPollingBot {
             } else if (data.startsWith("STATISTIC_")) {
                 String currencyCode = data.substring(10); // Masalan: "USD"
                 sendStatisticsWithStats(chatId, currencyCode);
+            } else if (data.equals("CALCULATOR")) {
+                waitingForCalculatorInput.put(chatId, true);
+                SendMessage ask = new SendMessage(chatId.toString(), """
+                        🧮 Kalkulyator:
+                        Valyuta summasi va kodini kiriting (masalan: 150 USD)
+                        """);
+                executeSafely(ask);
             }
         }
     }
@@ -173,18 +191,92 @@ public class TestBot extends TelegramLongPollingBot {
         InlineKeyboardButton statistic = new InlineKeyboardButton("\uD83E\uDDE0 Valyuta haqida statistik ma’lumot");
         statistic.setCallbackData("STATISTIC");
 
+        InlineKeyboardButton calcButton = new InlineKeyboardButton("🧮 Kalkulyator");
+        calcButton.setCallbackData("CALCULATOR");
+
         InlineKeyboardButton backButton = new InlineKeyboardButton("⬅️ Ortga");
         backButton.setCallbackData("BACK_TO_START");
 
-        rows.add(List.of(button1));
-        rows.add(List.of(history));
-        rows.add(List.of(statistic));
+        rows.add(List.of(button1, history));
+        rows.add(List.of(statistic, calcButton));
         rows.add(List.of(backButton));
 
         markup.setKeyboard(rows);
         message.setReplyMarkup(markup);
         executeSafely(message);
     }
+
+    private String handleMultiCurrencyConvert(String input) {
+        try {
+            String[] parts = input.split(" ");
+            BigDecimal amount = new BigDecimal(parts[0]);
+            String fromCcy = parts[1].toUpperCase();
+
+            // Valyutalar ro'yxati
+            List<String> toCurrencies = List.of("UZS", "USD", "EUR", "RUB", "JPY", "KGS");
+
+            // API orqali valyutalar kursini olish
+            List<CurrencyRate> rates = fetchLatestRates();
+
+            StringBuilder response = new StringBuilder("💵 " + amount + " " + fromCcy + " =\n\n");
+
+            BigDecimal fromRateValue;
+            if (fromCcy.equals("UZS")) {
+                fromRateValue = BigDecimal.ONE; // UZS bazaviy valyuta
+            } else {
+                CurrencyRate fromRate = rates.stream()
+                        .filter(r -> r.getCcy().equals(fromCcy))
+                        .findFirst()
+                        .orElseThrow(() -> new RuntimeException("From valyuta topilmadi: " + fromCcy));
+                fromRateValue = new BigDecimal(fromRate.getRate());
+            }
+
+            for (String to : toCurrencies) {
+                if (to.equals(fromCcy)) continue; // O'zini o'ziga aylantirmaslik
+
+                BigDecimal toRateValue;
+                if (to.equals("UZS")) {
+                    toRateValue = BigDecimal.ONE;
+                } else {
+                    CurrencyRate toRate = rates.stream()
+                            .filter(r -> r.getCcy().equals(to))
+                            .findFirst()
+                            .orElse(null);
+
+                    if (toRate == null) continue;
+
+                    toRateValue = new BigDecimal(toRate.getRate());
+                }
+
+                // UZS orqali konvertatsiya
+                BigDecimal uzsAmount = amount.multiply(fromRateValue); // Birinchi UZSga o'tamiz
+                BigDecimal converted = uzsAmount.divide(toRateValue, 2, RoundingMode.HALF_UP); // So'ngra boshqa valyutaga
+
+                response.append("🔸 ").append(to).append(": ").append(converted).append("\n");
+            }
+
+            return response.toString();
+
+        } catch (Exception e) {
+            return "❌ Format noto‘g‘ri. Masalan: `150 USD` deb yozing.";
+        }
+    }
+
+    private List<CurrencyRate> fetchLatestRates() {
+        try {
+            Gson gson = new Gson();
+            URL url = new URL("https://cbu.uz/oz/arkhiv-kursov-valyut/json/");
+            URLConnection connection = url.openConnection();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(connection.getInputStream()));
+            List<CurrencyRate> rates = gson.fromJson(reader, new TypeToken<List<CurrencyRate>>() {
+            }.getType());
+            return rates;
+        } catch (IOException e) {
+            e.printStackTrace();
+            return Collections.emptyList(); // Xatolik bo‘lsa bo‘sh ro‘yxat qaytaradi
+        }
+    }
+
 
     private void sendStatisticsWithStats(Long chatId, String ccy) {
         try {
